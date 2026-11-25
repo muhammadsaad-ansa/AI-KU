@@ -1,0 +1,6 @@
+{
+  "name": "Gemini AI Widget & Knowledge Hub",
+  "description": "AI website assistant powered by Google Gemini, PDF brain and skills management, RAG search, and website automation actions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
