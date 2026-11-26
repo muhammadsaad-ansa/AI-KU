@@ -278,14 +278,9 @@ Isi "aksi" hanya dengan aksi dari daftar di atas, dan kosongkan array "aksi" bil
   }
 });
 
-// Admin auth middleware
+// Admin auth middleware (bypassed / no token required)
 function checkAdminAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const token = req.headers['x-token'] || req.query.token;
-  if (!ADMIN_TOKEN || token === ADMIN_TOKEN || token === 'admin123' || ADMIN_TOKEN === 'admin123' || !token) {
-    next();
-  } else {
-    res.status(401).json({ error: 'Unauthorized: Token admin salah atau kosong.' });
-  }
+  next();
 }
 
 // Admin: list PDF files
