@@ -32,7 +32,13 @@ export default function App() {
   // State for PDFs
   const [otakFiles, setOtakFiles] = useState<string[]>([]);
   const [skillFiles, setSkillFiles] = useState<string[]>([]);
-  const [adminToken, setAdminToken] = useState<string>('admin123');
+  const [adminToken, setAdminToken] = useState<string>(() => {
+    return localStorage.getItem('adminToken') || 'admin123';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('adminToken', adminToken);
+  }, [adminToken]);
   const [uploadJenis, setUploadJenis] = useState<'otak' | 'skill'>('otak');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
