@@ -252,19 +252,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Quick Admin Token Input */}
-        <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300">
-            <Shield className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Admin Token:</span>
-            <input
-              type="password"
-              value={adminToken}
-              onChange={e => setAdminToken(e.target.value)}
-              className="bg-transparent border-none text-white focus:outline-none w-24 font-mono"
-            />
-          </div>
-        </div>
       </header>
 
       {/* Navigation Tabs */}
@@ -763,15 +750,9 @@ export default function App() {
               </h2>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Admin Token (X-Token)</label>
-                  <input
-                    type="text"
-                    value={adminToken}
-                    onChange={e => setAdminToken(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Token rahasia untuk otorisasi upload dan penghapusan file PDF.</p>
+                <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                  <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Status Sistem</h4>
+                  <p className="text-sm text-slate-300">Mode tanpa token aktif (bebas upload dan kelola PDF tanpa login).</p>
                 </div>
 
                 <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2">
