@@ -33,8 +33,9 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-// Storage directories
+// Storage directories & persistent database file
 const STORAGE_DIR = path.resolve(__dirname, 'storage');
+const DB_FILE = path.join(STORAGE_DIR, 'database.json');
 const FOLDERS: Record<string, string> = {
   otak: path.join(STORAGE_DIR, 'otak'),
   skill: path.join(STORAGE_DIR, 'skill')
@@ -46,19 +47,59 @@ for (const dir of Object.values(FOLDERS)) {
   }
 }
 
+interface StoredFileRecord {
+  name: string;
+  category: 'otak' | 'skill';
+  data: string; // base64
+  updatedAt: number;
+}
+
+// Load database or initialize
+function loadDatabase(): StoredFileRecord[] {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Error loading database.json:', err);
+  }
+  return [];
+}
+
+function saveDatabase(records: StoredFileRecord[]) {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(records, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving database.json:', err);
+  }
+}
+
+// Restore files from persistent database to disk on startup
+function restoreFilesFromDatabase() {
+  const records = loadDatabase();
+  for (const rec of records) {
+    const targetDir = FOLDERS[rec.category];
+    if (targetDir) {
+      const filePath = path.join(targetDir, rec.name);
+      if (!fs.existsSync(filePath)) {
+        try {
+          const buffer = Buffer.from(rec.data, 'base64');
+          fs.writeFileSync(filePath, buffer);
+          console.log(`Restored persistent file: ${rec.category}/${rec.name}`);
+        } catch (err) {
+          console.error(`Failed to restore file ${rec.name}:`, err);
+        }
+      }
+    }
+  }
+}
+
+restoreFilesFromDatabase();
+
 // Multer setup for PDF uploads
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const jenis = String((req.body && req.body.jenis) || (req.query && req.query.jenis) || 'otak');
-      const targetDir = FOLDERS[jenis] || FOLDERS.otak;
-      cb(null, targetDir);
-    },
-    filename: (req, file, cb) => {
-      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-      cb(null, Date.now() + '-' + safeName);
-    }
-  }),
+  storage: multer.memoryStorage(), // Use memory storage to easily get buffer for base64 persistence
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf')) {
@@ -77,6 +118,7 @@ async function readPdfText(filePath: string): Promise<string> {
     return pdfCache[filePath];
   }
   try {
+    if (!fs.existsSync(filePath)) return '';
     const dataBuffer = fs.readFileSync(filePath);
     const data = await pdfParse(dataBuffer);
     pdfCache[filePath] = data.text || '';
@@ -259,21 +301,43 @@ app.get('/api/admin/daftar', checkAdminAuth, (req, res) => {
   res.json(result);
 });
 
-// Admin: upload PDF
+// Admin: upload PDF with persistent DB backup
 app.post('/api/admin/upload', checkAdminAuth, upload.single('file'), (req, res) => {
   try {
     const jenis = String(req.body.jenis || 'otak');
-    if (!FOLDERS[jenis] || !req.file) {
+    const file = req.file;
+    if (!FOLDERS[jenis] || !file) {
       return res.status(400).json({ error: 'Parameter tidak valid atau file PDF tidak ditemukan.' });
     }
-    delete pdfCache[req.file.path];
-    res.json({ ok: true, filename: req.file.filename });
+
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filename = Date.now() + '-' + safeName;
+    const targetDir = FOLDERS[jenis];
+    const filePath = path.join(targetDir, filename);
+
+    // Save file to disk
+    fs.writeFileSync(filePath, file.buffer);
+    delete pdfCache[filePath];
+
+    // Update persistent database json
+    const records = loadDatabase();
+    // Remove existing if duplicate name
+    const filtered = records.filter(r => !(r.category === jenis && r.name === filename));
+    filtered.push({
+      name: filename,
+      category: jenis as 'otak' | 'skill',
+      data: file.buffer.toString('base64'),
+      updatedAt: Date.now()
+    });
+    saveDatabase(filtered);
+
+    res.json({ ok: true, filename });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Admin: delete PDF
+// Admin: delete PDF & update persistent DB
 app.post('/api/admin/hapus', checkAdminAuth, (req, res) => {
   try {
     const { jenis, nama } = req.body;
@@ -287,6 +351,12 @@ app.post('/api/admin/hapus', checkAdminAuth, (req, res) => {
       fs.unlinkSync(filePath);
       delete pdfCache[filePath];
     }
+
+    // Update persistent database json
+    const records = loadDatabase();
+    const filtered = records.filter(r => !(r.category === folderKey && r.name === safeName));
+    saveDatabase(filtered);
+
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
